@@ -11,6 +11,14 @@ cmake ..
 ./test
 ```
 
+If you want to use MKL, use DMKLUSE flag:
+```
+mkdir build
+cd build
+cmake -DMKLUSE=on ..
+./test
+```
+
 # example 
 
 ```fortran
