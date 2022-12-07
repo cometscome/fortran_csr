@@ -1,1 +1,0 @@
-/opt/homebrew/bin/gfortran  -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX12.1.sdk -mmacosx-version-min=11.4 CMakeFiles/test.dir/src/main.f90.o -o test  libcsrmodule.a 

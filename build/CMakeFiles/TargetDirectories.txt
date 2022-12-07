@@ -1,4 +1,0 @@
-/Users/yuki/git/fortran_csr/build/CMakeFiles/rebuild_cache.dir
-/Users/yuki/git/fortran_csr/build/CMakeFiles/edit_cache.dir
-/Users/yuki/git/fortran_csr/build/CMakeFiles/test.dir
-/Users/yuki/git/fortran_csr/build/CMakeFiles/csrmodule.dir

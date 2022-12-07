@@ -1,5 +1,0 @@
-# The fortran modules provided by this target.
-provides
- csrmodule.mod
- csrvector.mod
- sparsevector.mod
