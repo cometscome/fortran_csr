@@ -26,6 +26,12 @@ ${srcdir}/csrvector.F90
 
 target_link_libraries(csrmodule PRIVATE ${linklibraries} )
 
+if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
+  # using GCC
+
+  target_compile_options(csrmodule PUBLIC -fallow-argument-mismatch -Wall -fbounds-check -O -Wuninitialized -fbacktrace -g)
+elseif(CMAKE_fortran_COMPILER_ID STREQUAL "Intel")
+endif()
 
 add_executable(test)
 

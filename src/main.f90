@@ -7,11 +7,18 @@ end program main
 subroutine vectortest()
     use csrvector
     implicit none
-    type(CSRcomplex_vector)::x,y
+    type(CSRcomplex_vector)::x,y,ytemp2
     integer::N
     complex(8)::v,alpha,beta
+    real(8)::mu,t
     integer::i
     complex(8),allocatable::xdense(:)
+    complex(8),allocatable::ytemp(:)
+    complex(8),allocatable::xdense2(:)
+    complex(8),allocatable::xdense3(:)
+    type(CSRcomplex)::H
+    complex(8),allocatable::Hdense(:,:)
+    
 
     v = -1d0
 
@@ -39,7 +46,125 @@ subroutine vectortest()
     write(*,*) "y"
     call y%print()
 
+    alpha = y%get(8)
+    write(*,*) alpha
+    !alpha = y%get(9)
+    !write(*,*) alpha
 
+    allocate(ytemp(1:2*N))
+
+    t = -1d0
+    mu = -1.5d0
+
+    allocate(Hdense(2*N,2*N))
+    call make_matrix(H,N,mu,t,v,Hdense)
+    ytemp = H*xdense
+
+    xdense2 = matmul(Hdense,xdense)
+    ytemp2 = H*y
+    do i=1,2*N
+        write(*,*) i,ytemp(i),ytemp2%get(i),xdense2(i)
+    end do
+
+    xdense = H*ytemp
+    xdense3 = matmul(Hdense,xdense2)
+
+    y = H*ytemp2
+
+    do i=1,2*N
+        write(*,*) i,xdense(i),y%get(i),xdense3(i)
+    end do
+
+    ytemp = H*xdense
+    xdense2 = matmul(Hdense,xdense3)
+    ytemp2 = H*y
+
+    do i=1,2*N
+        write(*,*) i,ytemp(i),ytemp2%get(i),xdense2(i)
+    end do
+
+
+
+
+
+
+
+end subroutine
+
+subroutine make_matrix(H,N,mu,t,v,Hdense)
+    use csrmodule
+    implicit none
+    type(CSRcomplex)::H
+    integer::i,j
+    integer,intent(in)::N
+    real(8)::mu,t
+    complex(8)::v
+    complex(8)::Hdense(2*N,2*N)
+
+
+
+    
+
+    H = CSRcomplex(2*N)
+    do i = 1,N
+        j = i
+        v = -mu
+
+        call H%set(v,i,j)
+        Hdense(i,j) = v
+        call H%set(-v,i+N,j+N)
+        Hdense(i+N,j+N) = -v
+
+        v = t
+        j = i+1
+        if (j > 0 .and. j < N+1) then
+            call H%set(v,i,j)
+            Hdense(i,j) = v
+            call H%set(v,j,i)
+            Hdense(j,i) = v
+
+            call H%set(-v,i+N,j+N)
+            Hdense(i+N,j+N) = -v
+            call H%set(-v,j+N,i+N)
+            Hdense(j+N,i+N) = -v
+        end if
+
+        j = i-1
+        v =t
+
+        if (j > 0 .and. j < N+1) then
+            call H%set(v,i,j)
+            Hdense(i,j) = v
+            call H%set(v,j,i)
+            Hdense(j,i) = v
+
+            call H%set(-v,i+N,j+N)
+            Hdense(i+N,j+N) = -v
+            call H%set(-v,j+N,i+N)
+            Hdense(j+N,i+N) = -v
+        end if
+
+        j = i+N
+        v = 0.5d0
+        call H%set(v,i,j)
+        Hdense(i,j) = v
+        call H%set(v,j,i)
+        Hdense(j,i) = v
+
+    end do
+
+    !call H%print()
+
+    do i=1,N
+        j = i+N
+        v = 0.6d0
+        call H%update(v,i,j)
+        Hdense(i,j) = v
+        call H%update(v,j,i)
+        Hdense(j,i) = v
+
+
+    end do
 
 
 end subroutine

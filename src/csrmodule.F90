@@ -6,7 +6,6 @@ module csrmodule
     public :: operator(*)
 
     type CSRcomplex
-        private
         integer::N !正方行列を仮定している。
         complex(8),allocatable::val(:)
         integer,allocatable::row(:)
@@ -73,8 +72,10 @@ module csrmodule
         do i=1,N
             y(i) = 0.0d0
             do j=row(i), row(i+1)-1
+                !write(*,*) j,col(j),val(j),x(col(j))
                 y(i) = y(i)+val(j)*x(col(j))
             end do
+            !write(*,*) "ij",i,y(i)
         end do
     end subroutine
 

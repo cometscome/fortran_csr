@@ -2,10 +2,9 @@ module csrvector
     use csrmodule
     implicit none
     public CSRcomplex_vector
-    !public :: operator(*)
+    public :: operator(*)
 
     type CSRcomplex_vector
-        private
         integer::N 
         complex(8),allocatable::val(:)
         integer,allocatable::indices(:)
@@ -16,6 +15,10 @@ module csrvector
         procedure::set => set_c
         procedure::print => print_csr 
         procedure::convert_to_dense 
+        procedure::matmul => matmul_axy  !y = A*x: matmul(x,y)
+        procedure::get => get_c
+        procedure::update => update_c
+        procedure::clear
     end type
 
 
@@ -29,6 +32,10 @@ module csrvector
     interface insert_element
         module procedure::insert_c
         module procedure::insert_int
+    end interface
+
+    interface operator(*)
+        module procedure mult
     end interface
 
     contains
@@ -45,7 +52,7 @@ module csrvector
         integer,intent(in)::N    
         real(8),intent(in)::epsilon
         x%N = N
-        x%epsilon = 0d0
+        x%epsilon = epsilon
         allocate(x%indices(N))
         allocate(x%val(N)) 
         x%val = 0d0
@@ -64,7 +71,7 @@ module csrvector
 
         x = CSRcomplex_vector(N,epsilon)
         do i=1,N
-            if(abs(xdense(i)) .ge. epsilon) then
+            if(abs(xdense(i)) > epsilon) then
                 call x%set(xdense(i),i)
             end if
         end do
@@ -79,6 +86,75 @@ module csrvector
         x = CSRcomplex_vector(xdense,0d0)
         return
     end function
+
+    function mult(A,x) result(y)
+        implicit none
+        type(CSRcomplex),intent(in)::A
+        type(CSRcomplex_vector),intent(in)::x
+        type(CSRcomplex_vector)::y
+
+        y = CSRcomplex_vector(x%N,x%epsilon)
+        call y%clear()
+
+        call x%matmul(A,y)
+
+
+    end function
+
+    subroutine matmul_axy(self,A,y) 
+        implicit none
+        type(CSRcomplex),intent(in)::A
+        class(CSRcomplex_vector),intent(in)::self
+        type(CSRcomplex_vector),intent(out)::y
+
+        integer::i,j,k,k2
+        integer::nonzeros
+        type(CSRcomplex_vector)::ytmp
+        complex(8)::v,vi,vtmp
+        ytmp = CSRcomplex_vector(self%N,self%epsilon)
+        y = CSRcomplex_vector(self%N,self%epsilon)
+        call y%clear()
+        call ytmp%clear()
+
+
+        nonzeros = self%numofdata
+        !write(*,*) "nonzeros",nonzeros
+        do k=1,nonzeros
+            i = self%indices(k)
+            vi = self%val(k)
+            do k2=A%row(i), A%row(i+1)-1
+                j = A%col(k2)
+                !write(*,*) "i,j ",i,j
+                
+                v = conjg(A%val(k2))*vi
+                vtmp = ytmp%get(j)
+                call ytmp%set(vtmp + v,j)
+            end do
+        end do
+
+        !write(*,*) ytmp%indices
+
+        do k=1,ytmp%numofdata
+            call y%set(ytmp%val(k),ytmp%indices(k))
+        end do
+            
+
+        
+
+
+
+
+    end subroutine
+
+    subroutine clear(self)
+        implicit none
+        class(CSRcomplex_vector)::self
+        integer::i
+        self%val(1:self%numofdata) = 0d0
+        self%indices(1:self%numofdata) = 0
+        self%numofdata = 0
+
+    end subroutine
 
     subroutine convert_to_dense(self,xdense)
         implicit none
@@ -115,6 +191,30 @@ module csrvector
 
         return
     end subroutine print_csr
+
+    complex(8) function get_c(self,j) result(v)
+        implicit none
+        class(CSRcomplex_vector)::self
+        integer,intent(in)::j
+        integer::nonzeros
+        integer::rowifirstk,rowilastk
+        integer::searchk
+
+        call boundcheck(self%N,j)
+        rowifirstk = 1
+        rowilastk = self%numofdata
+        call searchsortedfirst(self%indices(1:self%numofdata),j,rowifirstk,rowilastk,searchk)
+        !write(*,*) j,searchk
+
+        if (searchk .le. rowilastk .and. self%indices(searchk) .eq. j) then
+            v = self%val(searchk)
+            return
+        else
+            v = 0d0
+        end if
+        return
+
+    end function
 
 
     subroutine set_c(self,v,j)
@@ -179,6 +279,7 @@ module csrvector
 
         searchk = iend+1!ubound(vec,1)+1
         do k=istart,iend
+            !write(*,*) k,i,vec(k)
             if (vec(k) .eq. i) then
                 searchk = k
                 return
@@ -230,6 +331,30 @@ module csrvector
 
         return
     end subroutine insert_int
+
+    subroutine update_c(self,v,j)
+        implicit none
+        class(CSRcomplex_vector)::self
+        complex(8),intent(in)::v
+        integer,intent(in)::j
+        integer::rowifirstk,rowilastk
+        integer::searchk
+
+        call boundcheck(self%N,j)
+        rowifirstk = 1
+        rowilastk = self%numofdata
+        call searchsortedfirst(self%indices(1:self%numofdata),j,rowifirstk,rowilastk,searchk)
+
+
+        if (searchk .le. rowilastk .and. self%indices(searchk) .eq. j) then
+            self%val(searchk) = v
+            return
+        else
+            write(*,*) "error! in csrmodules_vector. There is no entry at",j
+            stop
+        end if
+        return
+    end subroutine update_c
 
 
 
