@@ -1,0 +1,2 @@
+/usr/bin/ar qc libcsrmodule.a CMakeFiles/csrmodule.dir/src/csrmodule.F90.o CMakeFiles/csrmodule.dir/src/csrvector.F90.o CMakeFiles/csrmodule.dir/src/sparsevector.F90.o
+/usr/bin/ranlib libcsrmodule.a

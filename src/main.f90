@@ -6,8 +6,10 @@ end program main
 
 subroutine vectortest()
     use csrvector
+    use sparsevector
     implicit none
     type(CSRcomplex_vector)::x,y,ytemp2
+    type(Sparse_complex_vector)::x_s,y_s,ytemp2_s,ytemp3_s
     integer::N
     complex(8)::v,alpha,beta
     real(8)::mu,t
@@ -18,6 +20,8 @@ subroutine vectortest()
     complex(8),allocatable::xdense3(:)
     type(CSRcomplex)::H
     complex(8),allocatable::Hdense(:,:)
+    complex(8),parameter::ci = (0d0,1d0)
+    
     
 
     v = -1d0
@@ -27,10 +31,18 @@ subroutine vectortest()
 
     x = CSRcomplex_vector(2*N)
     call x%set(v,5)
-    call x%set(v,8)
-    call x%set(v,1)
+    call x%set(ci,8)
+    call x%set(0.2*ci,1)
 
     call x%print()
+
+    x_s = Sparse_complex_vector(2*N)
+    call x_s%set(v,5)
+    call x_s%set(ci,8)
+    call x_s%set(0.2*ci,1)
+
+    call x_s%print()
+
 
     write(*,*) "dense"
 
@@ -42,14 +54,32 @@ subroutine vectortest()
         end if
     end do
 
+    write(*,*) "dense"
+
+    call x_s%convert_to_dense(xdense)
+    do i=1,N
+        if (xdense(i) .ne. 0d0) then
+            write(*,*) i,xdense(i)
+        end if
+    end do
+
+
     y = CSRcomplex_vector(xdense)
     write(*,*) "y"
     call y%print()
 
     alpha = y%get(8)
     write(*,*) alpha
+
+    y_s = Sparse_complex_vector(xdense)
+    write(*,*) "y_s"
+    call y_s%print()
+
+    alpha = y_s%get(8)
+    write(*,*) alpha
     !alpha = y%get(9)
     !write(*,*) alpha
+    
 
     allocate(ytemp(1:2*N))
 
@@ -59,28 +89,52 @@ subroutine vectortest()
     allocate(Hdense(2*N,2*N))
     call make_matrix(H,N,mu,t,v,Hdense)
     ytemp = H*xdense
+    
 
     xdense2 = matmul(Hdense,xdense)
     ytemp2 = H*y
+    ytemp2_s = H*y_s
+
+    write(*,*) y_s%dot(ytemp2_s)
+    write(*,*) ytemp2_s%dot(ytemp2_s)
+    write(*,*) ytemp2_s%norm()**2
+
+    xdense3 = 0.2*matmul(Hdense,xdense2) + 0.1*xdense
+
+    ytemp3_s = Sparse_complex_vector(2*N)
+    alpha = 0.2d0
+    beta = 0.1d0
+    call ytemp3_s%matmul_add(alpha,H,ytemp2_s,beta,y_s)
     do i=1,2*N
-        write(*,*) i,ytemp(i),ytemp2%get(i),xdense2(i)
+        write(*,*) i,xdense3(i),ytemp3_s%get(i)
     end do
+    
+
+
+    stop
+    do i=1,2*N
+        write(*,*) i,ytemp(i),ytemp2%get(i),ytemp2_s%get(i)
+    end do
+
+    
 
     xdense = H*ytemp
     xdense3 = matmul(Hdense,xdense2)
 
     y = H*ytemp2
+    y_s = H*ytemp2_s
 
     do i=1,2*N
-        write(*,*) i,xdense(i),y%get(i),xdense3(i)
+        write(*,*) i,xdense(i),y%get(i),y_s%get(i)
     end do
 
     ytemp = H*xdense
     xdense2 = matmul(Hdense,xdense3)
     ytemp2 = H*y
+    ytemp2_s = H*y_s
 
     do i=1,2*N
-        write(*,*) i,ytemp(i),ytemp2%get(i),xdense2(i)
+        write(*,*) i,ytemp(i),ytemp2%get(i),ytemp2_s%get(i)
     end do
 
 
