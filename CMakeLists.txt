@@ -21,6 +21,7 @@ set(linklibraries ${lapacklink})
 target_sources(csrmodule 
 PRIVATE
 ${srcdir}/csrmodule.F90
+${srcdir}/csrvector.F90
 )
 
 target_link_libraries(csrmodule PRIVATE ${linklibraries} )

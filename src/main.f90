@@ -1,5 +1,51 @@
 program main
     use csrmodule
+    call vectortest()
+    !call matrixtest()
+end program main
+
+subroutine vectortest()
+    use csrvector
+    implicit none
+    type(CSRcomplex_vector)::x,y
+    integer::N
+    complex(8)::v,alpha,beta
+    integer::i
+    complex(8),allocatable::xdense(:)
+
+    v = -1d0
+
+
+    N = 10
+
+    x = CSRcomplex_vector(2*N)
+    call x%set(v,5)
+    call x%set(v,8)
+    call x%set(v,1)
+
+    call x%print()
+
+    write(*,*) "dense"
+
+    allocate(xdense(2*N))
+    call x%convert_to_dense(xdense)
+    do i=1,N
+        if (xdense(i) .ne. 0d0) then
+            write(*,*) i,xdense(i)
+        end if
+    end do
+
+    y = CSRcomplex_vector(xdense)
+    write(*,*) "y"
+    call y%print()
+
+
+
+
+end subroutine
+
+subroutine matrixtest()
+    use csrmodule
     implicit none
     type(CSRcomplex)::H
     integer::N
@@ -111,6 +157,4 @@ program main
     beta = 3d0
     call H%matmul2(x,y,z,alpha,beta)
     !write(*,*) "y = alpha*A*x+beta*z",y
-
-
-end program main
+end subroutine
