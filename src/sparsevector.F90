@@ -20,8 +20,11 @@ module sparsevector
         procedure::clear
         procedure::norm => norm_sp
         procedure::dot => dot_sp
-        procedure::add_vec
+        procedure::add_vec => add_c_axby
+        procedure::add_c_axby ! c = a*x + b*y
+        procedure::add_a_axby ! a = a*x + b*y
         procedure::matmul_add
+        procedure::reflesh
     end type
 
 
@@ -186,7 +189,7 @@ module sparsevector
 
     end subroutine
 
-    subroutine add_vec(self,alpha,a,beta,b) !c = alpha*a + beta*b
+    subroutine add_c_axby(self,alpha,a,beta,b) !c = alpha*a + beta*b
         implicit none
         class(Sparse_complex_vector)::self
         type(Sparse_complex_vector),intent(in)::a,b
@@ -234,6 +237,67 @@ module sparsevector
                 i = b%indices(ip)
                 if(check(i) .neqv. .true.) then
                     v = alpha*a%val(i) + beta*b%val(i)
+                    call self%set(v,i)
+                end if
+            end do
+        end if
+
+
+
+
+
+    end subroutine
+
+    subroutine add_a_axby(self,alpha,beta,b) !a = alpha*a + beta*b
+        implicit none
+        class(Sparse_complex_vector)::self
+        type(Sparse_complex_vector),intent(in)::b
+        complex(8),intent(in)::alpha,beta
+        integer::ip,i
+        logical::isb
+        logical,allocatable::check(:)
+        complex(8)::v
+
+        isb = .false.
+        if(self%numofdata < b%numofdata) then
+            isb = .true.
+        end if
+        allocate(check(self%N))
+        check = .false.
+
+
+        if (isb) then
+            do ip=1,b%numofdata
+                i = b%indices(ip)
+                
+                check(i) = .true.
+                v = alpha*self%val(i) + beta*b%val(i)
+                call self%set(v,i)
+            end do
+        else
+            do ip=1,self%numofdata
+                i = self%indices(ip)
+                check(i) = .true.
+                v = alpha*self%val(i) + beta*b%val(i)
+                call self%set(v,i)
+            end do
+        end if
+
+
+        if (isb) then
+            do ip=1,self%numofdata
+                i = self%indices(ip)
+                
+                if(check(i) .neqv. .true.) then
+                    v = alpha*self%val(i) + beta*b%val(i)
+                    call self%set(v,i)
+                end if
+            end do
+        else
+            do ip=1,b%numofdata
+                i = b%indices(ip)
+                if(check(i) .neqv. .true.) then
+                    v = alpha*self%val(i) + beta*b%val(i)
                     call self%set(v,i)
                 end if
             end do
@@ -407,14 +471,37 @@ module sparsevector
         implicit none
         class(Sparse_complex_vector)::self
         integer,intent(in)::j
-        integer::nonzeros
-        integer::rowifirstk,rowilastk
-        integer::searchk
 
         v = self%val(j)
         return
 
     end function
+
+    subroutine reflesh(self)
+        implicit none
+        class(Sparse_complex_vector)::self
+        integer::ip,i
+        type(Sparse_complex_vector)::tmp
+        complex(8)::v
+
+        tmp = Sparse_complex_vector(self%N,self%epsilon)
+
+        do ip=1,self%numofdata
+            i = self%indices(ip)
+            v = self%val(i)
+            if(abs(v) > self%epsilon) then
+                call tmp%set(v,i)
+            end if
+        end do
+
+        call self%clear()
+        do ip=1,tmp%numofdata
+            i = tmp%indices(ip)
+            v = tmp%val(i)
+            call self%set(v,i)
+        end do
+
+    end subroutine
 
 
     subroutine set_c(self,v,j)
@@ -422,14 +509,60 @@ module sparsevector
         class(Sparse_complex_vector)::self
         complex(8),intent(in)::v
         integer,intent(in)::j
-        integer::searchk
-        integer::rowifirstk,rowilastk
-        integer::nonzeros
-        integer::m
+        integer::ip,i
         complex(8)::vi
+        type(Sparse_complex_vector)::tmp
+        complex(8)::vtmp
         vi = self%val(j)
 
-        if(abs(vi) > self%epsilon) then
+
+        if(abs(vi) ==  0d0) then
+            if(abs(v) > self%epsilon) then
+                self%numofdata = self%numofdata + 1
+                self%indices(self%numofdata) = j
+                self%val(j) = v
+            end if
+        else
+            self%val(j) = v
+            !if(abs(v) > self%epsilon) then
+            !    self%val(j) = v
+            !end if
+        end if
+        return
+
+
+        if(abs(v) .le. self%epsilon) then
+            if(abs(vi) .ne.  0d0) then
+                self%val(j) = 1d-18
+            end if
+            if(abs(vi) > self%epsilon) then
+                !write(*,*) "nonzero",self%numofdata,v
+                !tmp = Sparse_complex_vector(self%N,self%epsilon)
+                !self%val(j) = 0d0
+                !do ip=1,self%numofdata
+                !    i = self%indices(ip)
+                !    vtmp = self%val(i)
+                !    if(abs(vtmp) > self%epsilon) then
+                !        call tmp%set(vtmp,i)
+                !    end if
+                !end do
+                !call self%clear()
+                !do ip=1,tmp%numofdata
+                !    i = tmp%indices(ip)
+                !    vtmp = tmp%val(i)
+                !    call self%set(vtmp,i)
+                !end do
+                !self%val(j) = self%epsilon+1d-16
+                self%val(j) = 1d-18
+                !write(*,*) "nonzero after",self%numofdata
+            end if
+            !return
+        end if
+        
+
+        !write(*,*) v,j,self%numofdata
+        if(abs(vi) .ne.  0d0) then
+        !if(abs(vi) > self%epsilon) then
             self%val(j) = v
         else
             self%numofdata = self%numofdata + 1

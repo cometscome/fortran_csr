@@ -1,8 +1,105 @@
 program main
     use csrmodule
-    call vectortest()
+    call rscgtest()
+    !call vectortest()
     !call matrixtest()
 end program main
+
+subroutine rscgtest()
+    use sparsevector
+    use csrmodule
+    use RSCG_sparse
+
+    implicit none
+    type(Sparse_complex_vector)::x_s,y_s,ytemp2_s,ytemp3_s
+    type(CSRcomplex)::H
+    integer::N
+    integer::Nx,Ny
+    complex(8)::v,alpha,beta
+    real(8)::mu,t
+    complex(8),parameter::ci = (0d0,1d0)
+    integer::ii,jj
+    complex(8),allocatable::vec_sigma(:),vec_theta(:)
+    real(8)::epsilon,eps
+    integer::maximumsteps
+    integer::M,i,ix,iy
+    real(8)::emax,emin,de,eta
+    real(8),parameter::pi = 3.141592653589793238d0
+    real(8)::d
+    integer::j
+    complex(8),allocatable::Hdense(:,:)
+    real(8)::time_begin,time_end
+    
+
+
+    v = -1d0
+    Nx = 150
+    Ny = 150
+    N = Nx*Ny
+    t = -1d0
+    mu = -1.5d0
+    d = 0.5d0
+
+
+
+    call make_2dcsrmatrix(H,Nx,Ny,mu,t,d)
+    !call H%print()
+
+    !call make_csrmatrix(H,N,mu,t,d)
+    !allocate(Hdense(2*N,2*N))
+    !call H%convert_to_dense(Hdense)
+    !call make_matrix(H,N,mu,t,d,Hdense)
+    !do i=1,2*N
+    !    do j=1,2*N
+    !        if(Hdense(i,j) .ne. 0d0) then
+    !            write(*,*) i,j,Hdense(i,j)
+    !        end if
+    !    end do
+    !end do
+    !stop
+
+    ix = Nx/2
+    iy = Ny/2
+    ii = (iy-1)*Nx + ix
+    jj = ii
+
+    maximumsteps = 10000
+    eps = 1d-7
+    epsilon = 1d-12
+
+    M = 1000
+    allocate(vec_sigma(M),vec_theta(M))
+    emax = 6d0
+    emin = -emax
+    eta = 0.05d0
+    de = (emax-emin)/dble(M-1)
+    do i=1,M
+        vec_sigma(i) =dble(i-1)*de + emin + ci*eta
+        !vec_sigma(i) = dble(i-1)*ci !dble(i-1)*de + emin + ci*eta
+    end do
+
+    write(*,*) "calculating Green's function..."
+    call cpu_time(time_begin)
+    call calculate_Green_function_csr(H,ii,jj,vec_sigma,vec_theta,epsilon,eps,maximumsteps)
+    call cpu_time(time_end)
+    write(*,*) time_end-time_begin,"[sec]"
+    write(*,*) "calculating Green's function..."
+    call cpu_time(time_begin)
+    call calculate_Green_function(H,ii,jj,vec_sigma,vec_theta,epsilon,eps,maximumsteps)
+    call cpu_time(time_end)
+    write(*,*) time_end-time_begin,"[sec]"
+
+    stop
+    !call calculate_Green_function_dense(Hdense,ii,jj,vec_sigma,vec_theta,epsilon,eps,maximumsteps)
+    !open(11,file="ldos.txt")
+    open(11,file="mat.txt")
+    do i=1,M
+        write(11,*) dble(vec_sigma(i)),(-1d0/pi)*dimag(vec_theta(i))
+        !write(*,*) dble(vec_sigma(i)),(-1d0/pi)*(vec_theta(i))
+    end do
+    close(11)
+
+end subroutine
 
 subroutine vectortest()
     use csrvector
@@ -21,6 +118,7 @@ subroutine vectortest()
     type(CSRcomplex)::H
     complex(8),allocatable::Hdense(:,:)
     complex(8),parameter::ci = (0d0,1d0)
+    real(8)::d
     
     
 
@@ -85,9 +183,10 @@ subroutine vectortest()
 
     t = -1d0
     mu = -1.5d0
+    d = 0.5d0
 
     allocate(Hdense(2*N,2*N))
-    call make_matrix(H,N,mu,t,v,Hdense)
+    call make_matrix(H,N,mu,t,d,Hdense)
     ytemp = H*xdense
     
 
@@ -145,13 +244,135 @@ subroutine vectortest()
 
 end subroutine
 
-subroutine make_matrix(H,N,mu,t,v,Hdense)
+subroutine make_2dcsrmatrix(H,Nx,Ny,mu,t,d)
+    use csrmodule
+    implicit none
+    type(CSRcomplex)::H
+    integer::i,j,ix,iy,jx,jy
+    integer,intent(in)::Nx,Ny
+    real(8)::mu,t
+    complex(8)::v
+    real(8)::d
+    integer::N
+
+    N = Nx*Ny
+    H = CSRcomplex(2*N)
+    do ix=1,Nx
+        do iy=1,Ny
+            i = (iy-1)*Nx + ix
+
+            jx = ix
+            jy = iy
+            j = (jy-1)*Nx + jx
+            v = -mu
+            call H%set(v,i,j)
+            call H%set(-v,i+N,j+N)
+
+
+            jx = ix +1
+            if(jx > Nx) jx = jx - Nx
+            jy = iy
+            j = (jy-1)*Nx + jx
+            v = t
+            call H%set(v,i,j)
+            call H%set(-v,i+N,j+N)
+
+            jx = ix -1
+            if(jx < 1) jx = jx + Nx
+            jy = iy
+            j = (jy-1)*Nx + jx
+            v = t
+            call H%set(v,i,j)
+            call H%set(-v,i+N,j+N)
+
+            jx = ix 
+            jy = iy +1
+            if(jy >  Ny) jy = jy - Ny
+            j = (jy-1)*Nx + jx
+            v = t
+            call H%set(v,i,j)
+            call H%set(-v,i+N,j+N)
+
+            jx = ix 
+            jy = iy-1
+            if(jy <  1) jy = jy + Ny
+            j = (jy-1)*Nx + jx
+            v = t
+            call H%set(v,i,j)
+            call H%set(-v,i+N,j+N)
+
+            j = i + N
+            v = d
+            call H%set(v,i,j)
+            call H%set(v,j,i)
+
+        end do
+    end do
+
+
+
+end subroutine
+
+subroutine make_csrmatrix(H,N,mu,t,d)
     use csrmodule
     implicit none
     type(CSRcomplex)::H
     integer::i,j
     integer,intent(in)::N
     real(8)::mu,t
+    complex(8)::v
+    real(8)::d
+
+
+
+    
+
+    H = CSRcomplex(2*N)
+    do i = 1,N
+        j = i
+        v = -mu
+
+        call H%set(v,i,j)
+        call H%set(-v,i+N,j+N)
+
+        v = t
+        j = i+1
+        if(j > N) j = j -N
+
+        if (j > 0 .and. j < N+1) then
+            call H%set(v,i,j)
+            call H%set(-v,i+N,j+N)
+        end if
+
+        j = i-1
+        if(j < 1) j = j +N
+        v =t
+
+        if (j > 0 .and. j < N+1) then
+            call H%set(v,i,j)
+            call H%set(-v,i+N,j+N)
+        end if
+
+        j = i+N
+        v = d
+        call H%set(v,i,j)
+        call H%set(v,j,i)
+
+    end do
+
+
+
+
+end subroutine
+
+subroutine make_matrix(H,N,mu,t,d,Hdense)
+    use csrmodule
+    implicit none
+    type(CSRcomplex)::H
+    integer::i,j
+    integer,intent(in)::N
+    real(8)::mu,t
+    real(8)::d
     complex(8)::v
     complex(8)::Hdense(2*N,2*N)
 
@@ -171,35 +392,30 @@ subroutine make_matrix(H,N,mu,t,v,Hdense)
 
         v = t
         j = i+1
+        if(j > N) j = j -N
         if (j > 0 .and. j < N+1) then
             call H%set(v,i,j)
             Hdense(i,j) = v
-            call H%set(v,j,i)
-            Hdense(j,i) = v
 
             call H%set(-v,i+N,j+N)
             Hdense(i+N,j+N) = -v
-            call H%set(-v,j+N,i+N)
-            Hdense(j+N,i+N) = -v
+
         end if
 
         j = i-1
+        if(j < 1) j = j +N
         v =t
 
         if (j > 0 .and. j < N+1) then
             call H%set(v,i,j)
             Hdense(i,j) = v
-            call H%set(v,j,i)
-            Hdense(j,i) = v
-
             call H%set(-v,i+N,j+N)
             Hdense(i+N,j+N) = -v
-            call H%set(-v,j+N,i+N)
-            Hdense(j+N,i+N) = -v
+
         end if
 
         j = i+N
-        v = 0.5d0
+        v = d
         call H%set(v,i,j)
         Hdense(i,j) = v
         call H%set(v,j,i)
@@ -207,18 +423,7 @@ subroutine make_matrix(H,N,mu,t,v,Hdense)
 
     end do
 
-    !call H%print()
 
-    do i=1,N
-        j = i+N
-        v = 0.6d0
-        call H%update(v,i,j)
-        Hdense(i,j) = v
-        call H%update(v,j,i)
-        Hdense(j,i) = v
-
-
-    end do
 
 
 end subroutine

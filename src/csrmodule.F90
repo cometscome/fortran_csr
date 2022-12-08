@@ -12,12 +12,14 @@ module csrmodule
         integer,allocatable::col(:)
 
         contains
+        procedure::convert_to_dense => convert_to_dense_matrix
         procedure::set => set_c !(i,j)成分にvを代入 set(v,i,j)
         procedure::print => print_csr !行列の中身をprint
         procedure::nonzero => get_nonzeronum  !非ゼロ要素の数を数える
         procedure::update => update_c !(i,j)成分の値をアップデート。なければエラーで止まる。
         procedure::matmul => matmul_axy  !y = A*x: matmul(x,y)
         procedure::matmul2 => matmul_axy2 !y = alpha*A*x +beta*b: matmul2(x,y,b,alpha,beta)
+        
     end type
 
     interface CSRcomplex
@@ -78,6 +80,7 @@ module csrmodule
             !write(*,*) "ij",i,y(i)
         end do
     end subroutine
+
 
 
     function mult(A,x) result(y)
@@ -162,6 +165,23 @@ module csrmodule
 
         return
     end subroutine print_csr
+
+    subroutine convert_to_dense_matrix(self,xdense)
+        implicit none
+        class(CSRcomplex)::self
+        complex(8),intent(out)::xdense(:,:)
+        integer::i,j,N
+
+        N = self%N
+        xdense = 0d0
+
+        do i=1,N
+            do j=self%row(i), self%row(i+1)-1
+                xdense(i,self%col(j)) = self%val(j)
+            end do
+        end do
+    end subroutine
+
 
     subroutine set_c(self,v,i,j)
         implicit none
